@@ -1,0 +1,23 @@
+<h2>Project 1- Just Breathe</h2>
+<p>by <a href="https://sites.google.com/uic.edu/yazhinirajesh/home">Yazhini Priyadharshini Rajesh</a></p>
+<p>The idea of this project is to visualize annual air quality data, to see how air quality around the US has changed since the early 1980. The information is taken from  the official site of the <a href="https://aqs.epa.gov/aqsweb/airdata/download_files.html">United States Environmental Protection Agency</a>.
+</p>
+<p>
+<a href="https://aqs.epa.gov/aqsweb/airdata/download_files.html/">About the data</a> The data was collected from 1980 to 2018 and are available online and the annual summary files are small enough to include all data in one file. <b>About each file : </b> Each group has data listed by year, in reverse order, back to 1980.
+Each table entry has the file name, linked to the file, the size of the (zipped) file, the number of data rows in the file, and the date the file was last modified. EPA updates these files twice per year; in the spring and fall (late May and November). Data collection agencies have up to 6 months to report their data. 
+</p>
+<h3>The Data</h3>
+<p>This application visualizes the following:</p>
+<ul>
+  <li><b>About the Project: </b> The user can choose any state from a list, and see all the counties in that state and then choose any of those counties, and be able to see an alphabetical list of all the counties in the US</li>
+  <li><b>AQI Air Quality: </b> A pie chart showing the percentage of days, and a bar chart, and table showing the number of days where the AQI was good / moderate / unhealthy for sensitive / unhealthy / very unhealthy / hazardous. A line graph using the annual data from 1980-2018 showing lines for the median, 90th percentile, and max AQI over those years</li>
+  <li><b>Pollutants In the Air: </b> A pie chart, bar graph and a table for each individual pollutant (CO, NO2, Ozone, SO2, PM2.5, PM10 ) showing the percentage of days in the year with that pollutant as the main pollutant. A line graph and table showing the percentages over the years for days CO / days NO2 / days Ozone, days SO2 / days PM2.5 / days PM10</li>
+  <li><b>Map View: </b> of USA with the location of the county in picture.</li>
+  <li>We can also compare the data of 3 counties using the <b>compare 3 counties</b> option in the list.</li>
+</ul>
+
+<h3>Application</h3>
+<p>This application is written in <em>R</em>, using the <em>shiny dashboard</em> framework. Graphs use <em>ggplot2</em> and <em>plotly</em>; the map view uses <em>leaflet</em> and location data from <em>addTiles</em>. In addition, <em>tidyr</em> and <em>jpeg</em> libraries are used to support corresponding functions.</p>
+<p>It is designed to be viewed as a dashboard with no scrolling. Select the items on the left navigation pane to switch between various views. We can also minimize the sidepad by using the minimize button on top next to the title. </p>
+<p> Items in the legend may be clicked to show/hide the item from the graph. Double-click on a legend item to show only that item. Hover over chart elements for more information about the point, bar or pie.</p>
+<p> The theme of the project was obtained online through the <em> dashboardthemes </em> library. </p>

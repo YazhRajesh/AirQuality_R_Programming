@@ -1,0 +1,512 @@
+sidebarMenu(
+menuItem("About", tabName = "about"),
+menuItem("AQI Air Quality",tabName = "aqiquality"),
+menuItem("Pollutants Comparison ",tabName = "Pollutant") ,
+menuItem("Compare Data of 3 Counties", tabName = "comparedata"))),
+dashboardBody(
+shinyDashboardThemes( theme = "grey_dark"),
+tabItems(
+tabItem("about", includeHTML("about.html")),
+tabItem("aqiquality",
+fluidRow(column(width =12,h1("AQI Over The Years"))),
+fluidRow(column(12,fluidRow(box(width = 14,status = "info",dataTableOutput("AQIQualityTable"))))),
+fluidRow(splitLayout(style = "border: 1px solid silver:", cellWidths = c(350,350,400),
+plotlyOutput("AQIPiePlot"),
+plotlyOutput("AQIBarGraph"),
+plotlyOutput("AQImaxq")))
+),
+tabItem("Pollutant",
+fluidRow(column(width =12,h1("Pollutant Over The Years"))),
+fluidRow(splitLayout(style = "border: 1px solid silver:", cellWidths = c(750,650),
+dataTableOutput("PollutantTable"),
+dataTableOutput("PollutantTypeTable"))),
+fluidRow(splitLayout(style = "border: 1px solid silver:", cellWidths = c(300,350,350,300),
+plotlyOutput("Pollutantline"),
+plotlyOutput("PollutantPiePlot"),
+plotlyOutput("PollutantBarGraph"),
+leafletOutput("Map0", height = 200)))
+),
+tabItem("comparedata",
+fluidRow(box(width = 4, selectInput("Year1", "Select the year to visualize", years1, selected = 2018, width="120px"),
+selectInput("State1", "Select the State to visualize", states1, selected = "Illinois", width="120px"),
+selectInput("County1", "Select the County to visualize", counties1, selected = "Cook", width="120px")),
+box(width = 4, selectInput("Year2", "Select the year to visualize", years2, selected = 2018, width="120px"),
+selectInput("State2", "Select the State to visualize", states2, selected = "Illinois", width="120px"),
+selectInput("County2", "Select the County to visualize", counties2, selected = "Cook",width="120px")),
+box(width = 4, selectInput("Year3", "Select the year to visualize", years3, selected = 2018, width="120px"),
+selectInput("State3", "Select the State to visualize", states3, selected = "Illinois", width="120px"),
+selectInput("County3", "Select the County to visualize", counties3, selected = "Cook",width="120px"))),
+fluidRow(title = "Compare 3 Counties", box(splitLayout(style = "border: 1px solid silver:", cellWidths = c(350,350,350),
+# plotlyOutput("Compare_pollutantBarGraph", height = "60vh"),
+# plotlyOutput("Compare_aqiLineGraph"),
+plotlyOutput("Compare_aqiBarGraph", height = "60vh")
+# plotlyOutput("comparestate3")
+))
+)
+)
+))
+)
+server <- function(input,output,session){
+#changing options for County depending on the State chosen
+observe({
+x <- input$State
+# Can use character(0) to remove all choices
+if (is.null(x))
+x <- character(0)
+# Can also set the label and select items
+updateSelectInput(session, "County",
+choices = weatherinfo$County[weatherinfo$State==x]
+)
+})
+observe({
+y <- input$State1
+# Can use character(0) to remove all choices
+if (is.null(x))
+x <- character(0)
+# Can also set the label and select items
+updateSelectInput(session, "County1",
+choices = State1info$County[State1info$State==y]
+)
+})
+observe({
+z <- input$State2
+# Can use character(0) to remove all choices
+if (is.null(x))
+x <- character(0)
+# Can also set the label and select items
+updateSelectInput(session, "County2",
+choices = State2info$County[State2info$State==z]
+)
+})
+observe({
+a <- input$State3
+# Can use character(0) to remove all choices
+if (is.null(x))
+x <- character(0)
+# Can also set the label and select items
+updateSelectInput(session, "County3",
+choices = State3info$County[State3info$State==a]
+)
+})
+data1 <- reactive({
+df1 <- weatherinfoGather[(weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year) |
+(weatherinfoGather$State == input$State2  & weatherinfoGather$County == input$County2 & weatherinfoGather$Year == input$Year) |
+(weatherinfoGather$State == input$State3  & weatherinfoGather$County == input$County3 & weatherinfoGather$Year == input$Year) ,c(2,14,15) ]
+df1 <- df1[order(df1$County),]
+df1
+})
+data2 <- reactive({
+df2 <- weatherinfoGather2[(weatherinfo2Gather$State == input$State  & weatherinfo2Gather$County == input$County & weatherinfo2Gather$Year == input$Year) |
+(weatherinfo2Gather$State == input$State2  & weatherinfo2Gather$County == input$County2 & weatherinfo2Gather$Year == input$Year) |
+(weatherinfo2Gather$State == input$State3  & weatherinfo2Gather$County == input$County3 & weatherinfo2Gather$Year == input$Year) ,c(2,14,15) ]
+df2 <- df2[order(df2$County),]
+df2
+})
+data3 <- reactive({
+df3 <- weatherinfo2Gather[(weatherinfo2Gather$State == input$State  & weatherinfo2Gather$County == input$County ) |
+(weatherinfo2Gather$State == input$State2  & weatherinfo2Gather$County == input$County2) |
+(weatherinfo2Gather$State == input$State3  & weatherinfo2Gather$County == input$County3) ,c(2,3,14,15)]
+df3 <- df3[order(df3$County),]
+df3
+})
+data4 <- reactive({
+df4 <- weatherinfo1Gather[(weatherinfo1Gather$State == input$State  & weatherinfo1Gather$County == input$County) |
+(weatherinfo1Gather$State == input$State2  & weatherinfo1Gather$County == input$County2) |
+(weatherinfo1Gather$State == input$State3  & weatherinfo1Gather$County == input$County3) ,c(2,3,20,21)]
+df4 <- df4[order(df4$County),]
+df4
+})
+output$AQIQualityTable <-
+renderDataTable(weatherinfo[weatherinfo$County == input$County & weatherinfo$State == input$State & weatherinfo$Year == input$Year ,c(1,2,3,5,6,7,8,9,10) ], options = list(columnDefs = list(list(
+targets = 1:9 , className = "right"
+)), pageLength = 5))
+output$AQIBarGraph  <- renderPlotly ({
+plot_ly(data = weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, ], x = reorder(weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, 14],-weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year,15 ]), y = weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year,15 ],
+color = (reorder(weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, 14],-weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year,15 ])) ,
+type = 'bar', colors = c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B")) %>%
+layout(title = paste("AQI types for", input$Year))
+})
+output$AQIPiePlot <-
+renderPlotly({
+colors <- c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B")
+plot_ly(weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, ], labels = ~ weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, 14], values = ~ weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, 15], type = 'pie',
+textposition = 'inside',
+textinfo = 'label+percent',
+insidetextfont = list(color = '#FFFFFF'),
+marker = list(colors = colors,
+line = list(color = '#FFFFFF', width = 1)), showlegend = FALSE) %>%
+layout(title = paste('AQI Quality for year ', input$Year),
+xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+})
+output$AQImaxq <- renderPlotly({
+plot_ly(data = weatherinfoGather3[weatherinfoGather3$State == input$State & weatherinfoGather3$County == input$County,],
+x = weatherinfoGather3[weatherinfoGather3$State == input$State & weatherinfoGather3$County == input$County,3],
+y = weatherinfoGather3[weatherinfoGather3$State == input$State & weatherinfoGather3$County == input$County,18],
+color = weatherinfoGather3[weatherinfoGather3$State == input$State & weatherinfoGather3$County == input$County,17],
+colors =c("#2E8B57","#00CED1","#FF8C00"),type="scatter",mode="lines+markers") %>%
+layout(title = "AQI over the years")
+})
+output$PollutantTable <-
+renderDataTable(weatherinfo[weatherinfo$County == input$County & weatherinfo$State == input$State & weatherinfo$Year == input$Year ,c(1,2,3,14,15,16,17,18,19) ],
+options = list(columnDefs = list(list(
+targets = 1:9 , className = "right")), pageLength = 5))
+output$PollutantTypeTable <-
+renderDataTable(weatherinfo1[weatherinfo1$County == input$County & weatherinfo1$State == input$State ,c(1,2,3,20,21,22,23,24,25) ],
+options = list(columnDefs = list(list(targets = 1:9 , className = "right")), pageLength = 5))
+output$PollutantBarGraph  <- renderPlotly ({
+plot_ly(data = weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, ], x = reorder(weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 14],-weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 15]), y = weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year,15 ],
+color = reorder(weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 14],-weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 15]) ,
+type = 'bar', colors = c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B")) %>%
+layout(title = paste("Pollutant types for", input$Year))
+})
+output$PollutantPiePlot <-
+renderPlotly({
+colors <- c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B")
+plot_ly(weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County &
+weatherinfoGather2$Year == input$Year, ],
+labels = ~ weatherinfoGather2[weatherinfoGather2$State == input$State  &
+weatherinfoGather2$County == input$County &
+weatherinfoGather2$Year == input$Year, 14],
+values = ~ weatherinfoGather2[weatherinfoGather2$State == input$State  &
+weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 15],
+type = 'pie',
+textposition = 'inside',
+textinfo = 'label+percent',
+insidetextfont = list(color = '#FFFFFF'),
+marker = list(colors = colors,
+line = list(color = '#FFFFFF', width = 1)),        showlegend = FALSE) %>%
+layout(title = paste('Pollutants for year ', input$Year) ,
+xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+})
+output$Pollutantline <- renderPlotly({
+plot_ly(data = weatherinfo1Gather[weatherinfo1Gather$State == input$State & weatherinfo1Gather$County == input$County,],
+x = weatherinfo1Gather[weatherinfo1Gather$State == input$State & weatherinfo1Gather$County == input$County,3],
+y = weatherinfo1Gather[weatherinfo1Gather$State == input$State & weatherinfo1Gather$County == input$County,21],
+color = weatherinfo1Gather[weatherinfo1Gather$State == input$State & weatherinfo1Gather$County == input$County,20],
+colors = c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B"),type="scatter",mode="lines+markers") %>%
+layout(title = "Pollutants % over the years")
+})
+# Render Leaflet Map for Location Data
+output$Map0 <- renderLeaflet({
+map <- leaflet()
+map <- addTiles(map)
+map <- setView(map, lng = mapdata[mapdata$County.Name == input$County & mapdata$State.Name == input$State,5][1], lat = mapdata[mapdata$County.Name == "Cook" & mapdata$State.Name == "Illinois",4][1], zoom = 1)
+map <- addMarkers(map, lng = mapdata[mapdata$County.Name == input$County & mapdata$State.Name == input$State,5][1], lat = mapdata[mapdata$County.Name == input$County & mapdata$State.Name == input$State,4][1], popup = input$County)
+map
+} )
+output$Compare_aqiBarGraph <- renderPlotly({
+ggplot(data1(), aes(y=Days, x=`AQI Parameters`, color=`AQI Parameters`, fill=`AQI Parameters`)) +
+geom_bar( stat="identity") +  facet_wrap(~County) + labs( y = "No of Days",title = paste("AQI types for", input$Year))+
+theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),legend.title =element_blank())
+})
+}
+shinyApp(server = server, ui = ui)
+runApp('appyazh.R')
+runApp('appyazh.R')
+library(shiny)
+library(shinydashboard)
+library(ggplot2)
+library(lubridate)
+library(DT)
+library(jpeg)
+library(grid)
+library(leaflet)
+library(scales)
+library(tidyr)
+library(plotly)
+library(dplyr)
+library(dashboardthemes)
+#read all the files (combining all aqi_by_county files into one dataframe and aqs_sites in another dataframe)
+temp = list.files(pattern="^an.*csv")
+allData2 <- lapply(temp, read.csv)
+weatherinfo <- do.call(rbind, allData2)
+mapdata <- read.csv(file = "aqs_sites.csv",header = TRUE, sep = ",")
+#converting the variable type of County, State and Year
+weatherinfo$County <- as.character(weatherinfo$County)
+weatherinfo$State <- as.character(weatherinfo$State)
+weatherinfo$Year <- as.numeric(as.character(weatherinfo$Year))
+#changing the names of the columns for better graph plotting
+names(weatherinfo)[names(weatherinfo)=="Good.Days"] <- "Good"
+names(weatherinfo)[names(weatherinfo)=="Moderate.Days"] <- "Moderate"
+names(weatherinfo)[names(weatherinfo)=="Unhealthy.for.Sensitive.Groups.Days"] <- "Unhealthy(Sensitive)"
+names(weatherinfo)[names(weatherinfo)=="Unhealthy.Days"] <- "Unhealthy"
+names(weatherinfo)[names(weatherinfo)=="Very.Unhealthy.Days"] <- "V Unhealthy"
+names(weatherinfo)[names(weatherinfo)=="Hazardous.Days"] <- "Hazardous"
+#gather is used to create seperate column for the AQI Parameters, Pollutants and MaxQ levels
+weatherinfoGather <- gather(weatherinfo, "AQI Parameters", "Days", 5:10)
+weatherinfoGather2 <- gather(weatherinfo, "Pollutants", "Days", 14:19)
+weatherinfoGather3 <- gather(weatherinfo,"Maxq", "Count", 11:13)
+State1info <- weatherinfoGather2
+State2info <- weatherinfoGather2
+State3info <- weatherinfoGather2
+weatherinfo1 <- weatherinfo
+weatherinfo1$CO <- (weatherinfo1$Days.CO / weatherinfo1$Days.with.AQI)* 100
+weatherinfo1$NO2 <- (weatherinfo1$Days.NO2 / weatherinfo1$Days.with.AQI) *100
+weatherinfo1$Ozone <- (weatherinfo1$Days.Ozone / weatherinfo1$Days.with.AQI) *100
+weatherinfo1$SO2 <- (weatherinfo1$Days.SO2 / weatherinfo1$Days.with.AQI) * 100
+weatherinfo1$PM2_5 <- (weatherinfo1$Days.PM2.5 / weatherinfo1$Days.with.AQI) * 100
+weatherinfo1$PM_10 <- (weatherinfo1$Days.PM10 / weatherinfo1$Days.with.AQI) * 100
+weatherinfo1 <- weatherinfo1 %>% mutate_if(is.numeric, round, 2)
+weatherinfo1Gather <- gather(weatherinfo1,"PollutantsNew","Count",20:25)
+#Creating new columns which has aggregate percentage of all AQI types
+weatherinfo2 <-weatherinfo
+weatherinfo2$Good <- (weatherinfo2$Good / weatherinfo2$Days.with.AQI)* 100
+weatherinfo2$Moderate <- (weatherinfo2$Moderate / weatherinfo2$Days.with.AQI) *100
+weatherinfo2$`Unhealthy(Sensitive)` <- (weatherinfo2$`Unhealthy(Sensitive)` / weatherinfo2$Days.with.AQI) *100
+weatherinfo2$Unhealthy <- (weatherinfo2$Unhealthy / weatherinfo2$Days.with.AQI) * 100
+weatherinfo2$`Very Unhealthy` <- (weatherinfo2$`Very Unhealthy` / weatherinfo2$Days.with.AQI) * 100
+weatherinfo2$Hazardous <- (weatherinfo2$Hazardous / weatherinfo2$Days.with.AQI) * 100
+weatherinfo2 <- weatherinfo2 %>% mutate_if(is.numeric, round, 2)
+weatherinfo2Gather <- gather(weatherinfo2,"AQIP","Values",5:10)
+# Create the menu items to select the different years and the different rooms
+counties <- weatherinfo[,2]
+years<-c(1980:2018)
+states <- weatherinfo[,1]
+counties1 <- weatherinfo[,2]
+years1<-c(1980:2018)
+states1 <- weatherinfo[,1]
+counties2 <- weatherinfo[,2]
+years2<-c(1980:2018)
+states2 <- weatherinfo[,1]
+counties3 <- weatherinfo[,2]
+years3<-c(1980:2018)
+states3 <- weatherinfo[,1]
+df <- weatherinfo1Gather[(weatherinfo1Gather$State == "Illinois"  & weatherinfo1Gather$County == "Cook") |
+(weatherinfo1Gather$State == "Alabama"  & weatherinfo1Gather$County == "Autauga") |
+(weatherinfo1Gather$State == "Alabama"  & weatherinfo1Gather$County == "Colbert") &
+weatherinfo1Gather$Year == 2018,c(2,14,15) ]
+# Dreate the shiny dashboard
+ui <- dashboardPage(skin = "purple",
+dashboardHeader(title = "Just Breathe", titleWidth = 350),
+dashboardSidebar(includeCSS("styles.css"), disable = FALSE, collapsed = FALSE,
+selectInput("State", "Select the State to visualize", states, selected = "Illinois"),
+selectInput("County", "Select the County to visualize", counties, selected = "Cook"),
+selectInput("Year", "Select the year to visualize", years, selected = 2018),
+sidebarMenu(
+menuItem("About", tabName = "about"),
+menuItem("AQI Air Quality",tabName = "aqiquality"),
+menuItem("Pollutants Comparison ",tabName = "Pollutant") ,
+menuItem("Compare Data of 3 Counties", tabName = "comparedata"))),
+dashboardBody(
+shinyDashboardThemes( theme = "grey_dark"),
+tabItems(
+tabItem("about", includeHTML("about.html")),
+tabItem("aqiquality",
+fluidRow(column(width =12,h1("AQI Over The Years"))),
+fluidRow(column(12,fluidRow(box(width = 14,status = "info",dataTableOutput("AQIQualityTable"))))),
+fluidRow(splitLayout(style = "border: 1px solid silver:", cellWidths = c(350,350,400),
+plotlyOutput("AQIPiePlot"),
+plotlyOutput("AQIBarGraph"),
+plotlyOutput("AQImaxq")))
+),
+tabItem("Pollutant",
+fluidRow(column(width =12,h1("Pollutant Over The Years"))),
+fluidRow(splitLayout(style = "border: 1px solid silver:", cellWidths = c(750,650),
+dataTableOutput("PollutantTable"),
+dataTableOutput("PollutantTypeTable"))),
+fluidRow(splitLayout(style = "border: 1px solid silver:", cellWidths = c(300,350,350,300),
+plotlyOutput("Pollutantline"),
+plotlyOutput("PollutantPiePlot"),
+plotlyOutput("PollutantBarGraph"),
+leafletOutput("Map0", height = 200)))
+),
+tabItem("comparedata",
+fluidRow(box(width = 4, selectInput("Year1", "Select the year to visualize", years1, selected = 2018, width="120px"),
+selectInput("State1", "Select the State to visualize", states1, selected = "Illinois", width="120px"),
+selectInput("County1", "Select the County to visualize", counties1, selected = "Cook", width="120px")),
+box(width = 4, selectInput("Year2", "Select the year to visualize", years2, selected = 2018, width="120px"),
+selectInput("State2", "Select the State to visualize", states2, selected = "Illinois", width="120px"),
+selectInput("County2", "Select the County to visualize", counties2, selected = "Cook",width="120px")),
+box(width = 4, selectInput("Year3", "Select the year to visualize", years3, selected = 2018, width="120px"),
+selectInput("State3", "Select the State to visualize", states3, selected = "Illinois", width="120px"),
+selectInput("County3", "Select the County to visualize", counties3, selected = "Cook",width="120px"))),
+fluidRow(title = "Compare 3 Counties", box(splitLayout(style = "border: 1px solid silver:", cellWidths = c(350,350,350),
+plotlyOutput("comparepollutant_bar", height = "60vh"),
+plotlyOutput("comparepollutant_line"),
+plotlyOutput("compareaqi_line", height = "60vh"),
+plotlyOutput("compareaqi_bar")
+))
+)
+)
+))
+)
+server <- function(input,output,session){
+#changing options for County depending on the State chosen
+observe({
+x <- input$State
+# Can use character(0) to remove all choices
+if (is.null(x))
+x <- character(0)
+# Can also set the label and select items
+updateSelectInput(session, "County",
+choices = weatherinfo$County[weatherinfo$State==x]
+)
+})
+observe({
+y <- input$State1
+# Can use character(0) to remove all choices
+if (is.null(y))
+y <- character(0)
+# Can also set the label and select items
+updateSelectInput(session, "County1",
+choices = State1info$County[State1info$State==y]
+)
+})
+observe({
+z <- input$State2
+# Can use character(0) to remove all choices
+if (is.null(z))
+z <- character(0)
+# Can also set the label and select items
+updateSelectInput(session, "County2",
+choices = State2info$County[State2info$State==z]
+)
+})
+observe({
+a <- input$State3
+# Can use character(0) to remove all choices
+if (is.null(a))
+a <- character(0)
+# Can also set the label and select items
+updateSelectInput(session, "County3",
+choices = State3info$County[State3info$State==a]
+)
+})
+output$AQIQualityTable <-
+renderDataTable(weatherinfo[weatherinfo$County == input$County & weatherinfo$State == input$State & weatherinfo$Year == input$Year ,c(1,2,3,5,6,7,8,9,10) ], options = list(columnDefs = list(list(
+targets = 1:9 , className = "right"
+)), pageLength = 5))
+output$AQIBarGraph  <- renderPlotly ({
+plot_ly(data = weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, ], x = reorder(weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, 14],-weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year,15 ]), y = weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year,15 ],
+color = (reorder(weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, 14],-weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year,15 ])) ,
+type = 'bar', colors = c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B")) %>%
+layout(title = paste("AQI types for", input$Year))
+})
+output$AQIPiePlot <-
+renderPlotly({
+colors <- c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B")
+plot_ly(weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, ], labels = ~ weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, 14], values = ~ weatherinfoGather[weatherinfoGather$State == input$State  & weatherinfoGather$County == input$County & weatherinfoGather$Year == input$Year, 15], type = 'pie',
+textposition = 'inside',
+textinfo = 'label+percent',
+insidetextfont = list(color = '#FFFFFF'),
+marker = list(colors = colors,
+line = list(color = '#FFFFFF', width = 1)), showlegend = FALSE) %>%
+layout(title = paste('AQI Quality for year ', input$Year),
+xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+})
+output$AQImaxq <- renderPlotly({
+plot_ly(data = weatherinfoGather3[weatherinfoGather3$State == input$State & weatherinfoGather3$County == input$County,],
+x = weatherinfoGather3[weatherinfoGather3$State == input$State & weatherinfoGather3$County == input$County,3],
+y = weatherinfoGather3[weatherinfoGather3$State == input$State & weatherinfoGather3$County == input$County,18],
+color = weatherinfoGather3[weatherinfoGather3$State == input$State & weatherinfoGather3$County == input$County,17],
+colors =c("#2E8B57","#00CED1","#FF8C00"),type="scatter",mode="lines+markers") %>%
+layout(title = "AQI over the years")
+})
+output$PollutantTable <-
+renderDataTable(weatherinfo[weatherinfo$County == input$County & weatherinfo$State == input$State & weatherinfo$Year == input$Year ,c(1,2,3,14,15,16,17,18,19) ],
+options = list(columnDefs = list(list(
+targets = 1:9 , className = "right")), pageLength = 5))
+output$PollutantTypeTable <-
+renderDataTable(weatherinfo1[weatherinfo1$County == input$County & weatherinfo1$State == input$State ,c(1,2,3,20,21,22,23,24,25) ],
+options = list(columnDefs = list(list(targets = 1:9 , className = "right")), pageLength = 5))
+output$PollutantBarGraph  <- renderPlotly ({
+plot_ly(data = weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, ], x = reorder(weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 14],-weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 15]), y = weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year,15 ],
+color = reorder(weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 14],-weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 15]) ,
+type = 'bar', colors = c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B")) %>%
+layout(title = paste("Pollutant types for", input$Year))
+})
+output$PollutantPiePlot <-
+renderPlotly({
+colors <- c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B")
+plot_ly(weatherinfoGather2[weatherinfoGather2$State == input$State  & weatherinfoGather2$County == input$County &
+weatherinfoGather2$Year == input$Year, ],
+labels = ~ weatherinfoGather2[weatherinfoGather2$State == input$State  &
+weatherinfoGather2$County == input$County &
+weatherinfoGather2$Year == input$Year, 14],
+values = ~ weatherinfoGather2[weatherinfoGather2$State == input$State  &
+weatherinfoGather2$County == input$County & weatherinfoGather2$Year == input$Year, 15],
+type = 'pie',
+textposition = 'inside',
+textinfo = 'label+percent',
+insidetextfont = list(color = '#FFFFFF'),
+marker = list(colors = colors,
+line = list(color = '#FFFFFF', width = 1)),        showlegend = FALSE) %>%
+layout(title = paste('Pollutants for year ', input$Year) ,
+xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+})
+output$Pollutantline <- renderPlotly({
+plot_ly(data = weatherinfo1Gather[weatherinfo1Gather$State == input$State & weatherinfo1Gather$County == input$County,],
+x = weatherinfo1Gather[weatherinfo1Gather$State == input$State & weatherinfo1Gather$County == input$County,3],
+y = weatherinfo1Gather[weatherinfo1Gather$State == input$State & weatherinfo1Gather$County == input$County,21],
+color = weatherinfo1Gather[weatherinfo1Gather$State == input$State & weatherinfo1Gather$County == input$County,20],
+colors = c("#2E8B57","#00CED1","#FF8C00","#000080","#C6590F","#8B008B"),type="scatter",mode="lines+markers") %>%
+layout(title = "Pollutants % over the years")
+})
+# Render Leaflet Map for Location Data
+output$Map0 <- renderLeaflet({
+map <- leaflet()
+map <- addTiles(map)
+map <- setView(map, lng = mapdata[mapdata$County.Name == input$County & mapdata$State.Name == input$State,5][1], lat = mapdata[mapdata$County.Name == "Cook" & mapdata$State.Name == "Illinois",4][1], zoom = 1)
+map <- addMarkers(map, lng = mapdata[mapdata$County.Name == input$County & mapdata$State.Name == input$State,5][1], lat = mapdata[mapdata$County.Name == input$County & mapdata$State.Name == input$State,4][1], popup = input$County)
+map
+} )
+compare1 <- reactive({
+data1 <- weatherinfoGather[(weatherinfoGather$State == input$State1  & weatherinfoGather$County == input$County1 & weatherinfoGather$Year == input$Year1) |
+(weatherinfoGather$State == input$State2  & weatherinfoGather$County == input$County2 & weatherinfoGather$Year == input$Year2) |
+(weatherinfoGather$State == input$State3  & weatherinfoGather$County == input$County3 & weatherinfoGather$Year == input$Year3) ,c(2,14,15) ]
+data1 <- data1[order(data1$County),]
+data1
+})
+output$compareaqi_bar <- renderPlotly({
+ggplot(compare1(), aes(y=Days, x=`AQI Parameters`, color=`AQI Parameters`, fill=`AQI Parameters`)) +
+geom_bar( stat="identity") +  facet_wrap(~County) + labs( y = "No of Days",title = paste("AQI types for", input$Year))+
+theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),legend.title =element_blank())
+})
+compare2 <- reactive({
+data2 <- weatherinfo2Gather[(weatherinfo2Gather$State == input$State  & weatherinfo2Gather$County == input$County ) |
+(weatherinfo2Gather$State == input$State2  & weatherinfo2Gather$County == input$County2) |
+(weatherinfo2Gather$State == input$State3  & weatherinfo2Gather$County == input$County3) ,c(2,3,14,15)]
+data2 <- data2[order(data2$County),]
+data2
+})
+output$compareaqi_line <- renderPlotly({
+ggplot(data2(), aes(y=Values, x=Year, color=AQIP, group =AQIP)) +
+geom_line() +  facet_wrap(~County) + labs( y = "No of Days",title = paste("AQI types over the years"))+
+theme(axis.title.x=element_blank(),legend.title =element_blank())
+})
+compare3 <- reactive({
+data3 <- weatherinfoGather2[(weatherinfo2Gather$State == input$State1  & weatherinfo2Gather$County == input$County1 & weatherinfo2Gather$Year == input$Year1) |
+(weatherinfo2Gather$State == input$State2  & weatherinfo2Gather$County == input$County2 & weatherinfo2Gather$Year == input$Year2) |
+(weatherinfo2Gather$State == input$State3  & weatherinfo2Gather$County == input$County3 & weatherinfo2Gather$Year == input$Year3) ,c(2,14,15) ]
+data3 <- data3[order(data3$County),]
+data3
+})
+output$comparepollutant_bar <- renderPlotly({
+ggplot(compare3(), aes(y=Days, x=Pollutants, color=Pollutants, fill=Pollutants)) +
+geom_bar( stat="identity") +  facet_wrap(~County) + labs(y = "No of Days",title = paste("Pollutant types for", input$Year))+
+theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),legend.title =element_blank())
+})
+compare4 <- reactive({
+data4 <- weatherinfo1Gather[(weatherinfo1Gather$State == input$State  & weatherinfo1Gather$County == input$County) |
+(weatherinfo1Gather$State == input$State2  & weatherinfo1Gather$County == input$County2) |
+(weatherinfo1Gather$State == input$State3  & weatherinfo1Gather$County == input$County3) ,c(2,3,20,21)]
+data4 <- data4[order(data4$County),]
+data4
+})
+output$comparepollutant_line <- renderPlotly({
+ggplot(compare4(), aes(y=Values, x=Year, color=PollutantsP, group =PollutantsP )) +
+geom_line() +  facet_wrap(~County) + labs(y = "No of Days",title = paste("Pollutant types % over the years"))+
+theme(axis.title.x=element_blank(),legend.title =element_blank())
+})
+}
+shinyApp(server = server, ui = ui)
+runApp('appyazh.R')
+runApp('appyazh.R')
+runApp('appyazh.R')
+runApp('appyazh.R')
+runApp('appyazh.R')
+runApp('appyazh.R')
